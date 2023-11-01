@@ -1,47 +1,56 @@
 #![feature(allocator_api)]
 #![feature(naked_functions)]
+#![feature(negative_impls)]
+#![feature(strict_provenance)]
+#![feature(asm_const)]
+#![feature(const_maybe_uninit_zeroed)]
 #![feature(core_intrinsics)]
-#![allow(named_asm_labels)]
+#![feature(ptr_internals)]
 #![no_std]
 #![no_main]
 
-use core::alloc::GlobalAlloc;
 use core::arch::asm;
-use core::intrinsics::atomic_load_acquire;
 
 use cfg_if::cfg_if;
 
-mod atomic;
 mod fs;
+mod interrupt;
+mod kbox;
 mod kmalloc;
-mod mutex;
 mod panic;
-
-extern "C" {
-    static STACK_TOP: usize;
-}
+mod sync;
+mod sysreg;
 
 #[naked]
 #[no_mangle]
 extern "C" fn start() {
+    const STACK_SIZE: usize = 32768;
+    #[link_section = ".bss.stack"]
+    #[no_mangle]
+    static STACK_SPACE: [u8; STACK_SIZE] = [0; STACK_SIZE];
+    #[link_section = ".bss.stack"]
+    #[no_mangle]
+    static STACK_TOP: [u8; 0] = [0; 0];
     unsafe {
         cfg_if! {
             if #[cfg(target_arch="aarch64")] {
                 asm!(
-                    "ldr x0, ={0}",
+                    "ldr x0, =0",
+                    "orr x0, x0, #3145728", // allow SIMD & FP for EL0/1
+                    "msr CPACR_EL1, x0",
+                    "ldr x0, =STACK_TOP",
                     "mov sp, x0",
-                    "bl {1}",
-                    sym STACK_TOP,
-                    sym kernel_main,
+                    "dsb ish",
+                    "bl {0}",
+                    sym main,
                     options(noreturn)
                 );
             } else if #[cfg(target_arch="arm")] {
                 asm!(
-                    "ldr r0, ={0}",
+                    "ldr r0, =STACK_TOP",
                     "mov sp, r0",
-                    "bl {1}",
-                    sym STACK_TOP,
-                    sym kernel_main,
+                    "bl {0}",
+                    sym main,
                     options(noreturn)
                 );
             }
@@ -49,14 +58,8 @@ extern "C" fn start() {
     }
 }
 
-#[no_mangle]
-fn kernel_main() {
-    // let a = 1337u32;
-    // let mut b = unsafe { atomic::load_uint(&a as *const _, Ordering::Relaxed) };
-    // b += 1;
-    let mut a = 0u32;
-    unsafe {
-        // atomic_store_seqcst(&mut a as *mut _, 1u32);
-        atomic_load_acquire(&a as *const _);
-    }
+unsafe fn main() -> ! {
+    interrupt::init();
+    kmalloc::init();
+    unreachable!()
 }
