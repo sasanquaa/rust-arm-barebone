@@ -3,6 +3,7 @@
 #![feature(negative_impls)]
 #![feature(strict_provenance)]
 #![feature(asm_const)]
+#![feature(error_in_core)]
 #![feature(const_maybe_uninit_zeroed)]
 #![feature(core_intrinsics)]
 #![feature(ptr_internals)]
@@ -10,20 +11,23 @@
 #![no_main]
 
 use core::arch::asm;
+use core::fmt::Debug;
 
 use cfg_if::cfg_if;
 
-mod fs;
-mod interrupt;
-mod kbox;
-mod kmalloc;
+use crate::alloc::slab;
+use crate::sys::interrupt;
+
+mod alloc;
+mod debug;
+mod io;
 mod panic;
 mod sync;
-mod sysreg;
+mod sys;
 
 #[naked]
 #[no_mangle]
-extern "C" fn start() {
+extern "C" fn boot() {
     const STACK_SIZE: usize = 32768;
     #[link_section = ".bss.stack"]
     #[no_mangle]
@@ -46,6 +50,7 @@ extern "C" fn start() {
                     options(noreturn)
                 );
             } else if #[cfg(target_arch="arm")] {
+                // FIXME: SIMD & FP?
                 asm!(
                     "ldr r0, =STACK_TOP",
                     "mov sp, r0",
@@ -59,7 +64,8 @@ extern "C" fn start() {
 }
 
 unsafe fn main() -> ! {
+    io::device::uart::init(0x09000000, 24000000);
     interrupt::init();
-    kmalloc::init();
+    slab::init();
     unreachable!()
 }

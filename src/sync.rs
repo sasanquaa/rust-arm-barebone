@@ -3,6 +3,8 @@ use core::hint::spin_loop;
 use core::ops::{Deref, DerefMut};
 use core::sync::atomic::{AtomicBool, Ordering};
 
+use crate::debug_assert_call_once;
+
 pub struct SpinMutex {
     locked: AtomicBool,
 }
@@ -50,10 +52,7 @@ pub struct LazyStatic<T, F = fn() -> T> {
     factory: F,
 }
 
-unsafe impl<T: Sync> Sync for LazyStatic<T> {}
-
-#[allow(suspicious_auto_trait_impls)]
-unsafe impl<T: Send> Send for LazyStatic<T> {}
+unsafe impl<T, F: Send> Sync for LazyStatic<T, F> {}
 
 impl<T> LazyStatic<T> {
     pub const fn new(factory: fn() -> T) -> Self {
@@ -75,6 +74,7 @@ impl<T> LazyStatic<T> {
         }
         let _ = self.mutex.lock();
         if (*self.value.get()).is_none() {
+            debug_assert_call_once!();
             *self.value.get() = Some((self.factory)());
         }
     }

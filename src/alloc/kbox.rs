@@ -2,9 +2,9 @@ use core::alloc::{Allocator, Layout};
 use core::ops::{Deref, DerefMut};
 use core::ptr::{NonNull, Unique};
 
-use crate::kmalloc::KmallocAllocator;
+use crate::alloc::slab::KAllocator;
 
-pub struct KBox<T: ?Sized, A: Allocator = KmallocAllocator> {
+pub struct KBox<T: ?Sized, A: Allocator = KAllocator> {
     ptr: Unique<T>,
     allocator: A,
     layout: Layout,
@@ -12,7 +12,7 @@ pub struct KBox<T: ?Sized, A: Allocator = KmallocAllocator> {
 
 impl<T> KBox<T> {
     pub fn new(value: T) -> Self {
-        let allocator = KmallocAllocator;
+        let allocator = KAllocator;
         let layout = Layout::new::<T>();
         let ptr = allocator.allocate(layout).unwrap().cast::<T>();
         unsafe {

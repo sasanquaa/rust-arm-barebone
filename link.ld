@@ -1,4 +1,4 @@
-ENTRY(start)
+ENTRY(boot)
 
 MEMORY
 {

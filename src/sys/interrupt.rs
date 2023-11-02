@@ -2,7 +2,10 @@ use core::arch::asm;
 
 use cfg_if::cfg_if;
 
+use crate::debug_assert_call_once;
+
 pub unsafe fn init() {
+    debug_assert_call_once!();
     cfg_if! {
         if #[cfg(any(target_arch = "aarch64"))] {
             init_table_vbar();

@@ -4,6 +4,7 @@ use core::mem::MaybeUninit;
 use core::ops::Add;
 use core::ptr::{NonNull, slice_from_raw_parts_mut};
 
+use crate::debug_assert_call_once;
 use crate::sync::SpinMutex;
 
 const BLOCK_COUNT: usize = 8;
@@ -19,13 +20,17 @@ const ALLOCATOR_SIZE: usize = 2097152;
 static ALLOCATOR_SPACE: [u8; ALLOCATOR_SIZE] = [0; ALLOCATOR_SIZE];
 
 pub unsafe fn init() {
-    ALLOCATOR.init();
+    debug_assert_call_once!();
+    let start_addr = (&ALLOCATOR_SPACE as *const u8).addr();
+    let end_addr = start_addr.add(ALLOCATOR_SIZE);
+    let capacity = end_addr - start_addr;
+    ALLOCATOR.init(start_addr, capacity);
 }
 
 #[derive(Copy, Clone, Default)]
-pub struct KmallocAllocator;
+pub struct KAllocator;
 
-unsafe impl alloc::Allocator for KmallocAllocator {
+unsafe impl alloc::Allocator for KAllocator {
     fn allocate(&self, layout: Layout) -> Result<NonNull<[u8]>, AllocError> {
         let ptr = unsafe { ALLOCATOR.alloc(layout) };
         if !ptr.is_null() {
@@ -50,12 +55,11 @@ unsafe impl Sync for SlabAllocator {}
 unsafe impl Send for SlabAllocator {}
 
 impl SlabAllocator {
-    unsafe fn init(&mut self) {
-        // FIXME: alignment?
-        // FIXME: assert call once
-        let start_addr = (&ALLOCATOR_SPACE as *const u8).addr();
-        let end_addr = start_addr.add(ALLOCATOR_SIZE);
-        let capacity = end_addr - start_addr + 1;
+    unsafe fn init(&mut self, start_addr: usize, capacity: usize) {
+        debug_assert!(
+            capacity % BLOCK_COUNT == 0,
+            "capacity is not divisible by BLOCK_COUNT"
+        );
         let allocator_capacity = capacity / BLOCK_COUNT;
         for (i, allocator) in self.allocators.iter_mut().enumerate() {
             let offset_addr = start_addr + i * allocator_capacity;
@@ -112,8 +116,7 @@ struct Allocator {
 
 impl Allocator {
     unsafe fn new(offset_addr: usize, size: usize, capacity: usize) -> Self {
-        // FIXME: assert capacity >= size
-        // FIXME: assert call once
+        debug_assert!(capacity >= size);
         let offset_start = offset_addr + size;
         let offset_end = offset_addr + capacity;
         let null_ptr_mut = ptr::null_mut::<FreeList>();

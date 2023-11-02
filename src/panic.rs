@@ -1,6 +1,12 @@
+use core::hint;
 use core::panic::PanicInfo;
+
+use crate::kprintln;
 
 #[panic_handler]
 fn panic(_: &PanicInfo) -> ! {
-    loop {}
+    kprintln!("panicked");
+    loop {
+        hint::spin_loop();
+    }
 }
