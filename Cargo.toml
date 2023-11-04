@@ -11,3 +11,4 @@ panic = "abort"
 
 [dependencies]
 cfg-if = "1.0.0"
+bitfield = "0.14.0"

@@ -45,6 +45,8 @@ unsafe impl alloc::Allocator for KAllocator {
     }
 }
 
+// TODO: Use improved version of SlabAllocator e.g. SlabAllocator with Magazines
+// TODO: Make SlabAllocator expandable by requesting for more memory
 struct SlabAllocator {
     mutex: SpinMutex,
     allocators: [Allocator; BLOCK_COUNT],

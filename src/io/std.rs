@@ -4,7 +4,7 @@ use crate::io::{IoResult, Read, Write};
 pub struct StdOut;
 
 impl Write for StdOut {
-    fn write(&mut self, buf: &[u8]) -> IoResult<usize> {
+    fn write(&mut self, _buf: &[u8]) -> IoResult<usize> {
         Ok(0)
     }
 
@@ -17,7 +17,7 @@ impl Write for StdOut {
 pub struct StdIn;
 
 impl Read for StdIn {
-    fn read(&mut self, buf: &mut [u8]) -> IoResult<usize> {
+    fn read(&mut self, _buf: &mut [u8]) -> IoResult<usize> {
         Ok(0)
     }
 }

@@ -16,7 +16,7 @@ SECTIONS
 {
     .text ALIGN(4K) : AT(ADDR(.text))
     {
-        *(.text.table*)
+        *(.text.itable*)
         *(.text*)
     } > ROM :text
 
@@ -24,11 +24,13 @@ SECTIONS
         *(.rodata*)
     } > ROM :data
 
-    .bss ALIGN(4K) (NOLOAD) : AT(ADDR(.bss))
+    .bss ALIGN(4K) (NOLOAD) : AT(ADDR(.rodata) + SIZEOF(.rodata))
     {
         *(.bss.stack*)
         . = ALIGN(16);
         . += 16; /* avoiding overlap */
         *(.bss.kmalloc*)
+        . = ALIGN(16);
+        *(.bss.ttable*)
     } > RAM :bss = 0
 }

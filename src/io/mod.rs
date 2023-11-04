@@ -9,7 +9,7 @@ pub mod std;
 pub enum IoError {}
 
 impl Display for IoError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+    fn fmt(&self, _f: &mut Formatter<'_>) -> core::fmt::Result {
         Ok(())
     }
 }

@@ -1,2 +1,2 @@
-pub mod interrupt;
-pub mod register;
+pub mod itable;
+pub mod vm;

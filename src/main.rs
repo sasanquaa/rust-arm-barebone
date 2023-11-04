@@ -11,12 +11,12 @@
 #![no_main]
 
 use core::arch::asm;
-use core::fmt::Debug;
+
 
 use cfg_if::cfg_if;
 
 use crate::alloc::slab;
-use crate::sys::interrupt;
+use crate::sys::itable;
 
 mod alloc;
 mod debug;
@@ -65,7 +65,7 @@ extern "C" fn boot() {
 
 unsafe fn main() -> ! {
     io::device::uart::init(0x09000000, 24000000);
-    interrupt::init();
+    itable::init();
     slab::init();
     unreachable!()
 }
