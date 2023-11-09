@@ -12,3 +12,7 @@ panic = "abort"
 [dependencies]
 cfg-if = "1.0.0"
 bitfield = "0.14.0"
+
+[features]
+#default = ["boot_from_flash"]
+boot_from_flash = []

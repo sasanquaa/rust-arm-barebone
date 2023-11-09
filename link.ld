@@ -1,11 +1,5 @@
 ENTRY(boot)
 
-MEMORY
-{
-    ROM (rx) : ORIGIN = 0x00100000, LENGTH = 1M /* Virt board ROM start */
-    RAM (rwx) : ORIGIN = 0x40000000, LENGTH = 127M /* Virt board RAM start */
-}
-
 PHDRS {
     text PT_LOAD;
     data PT_LOAD;
@@ -14,17 +8,31 @@ PHDRS {
 
 SECTIONS
 {
+    . = 0x00100000;
+
+    .boot ALIGN(4K) : AT(ADDR(.boot))
+    {
+        *(.boot*)
+    } :text
+
     .text ALIGN(4K) : AT(ADDR(.text))
     {
         *(.text.itable*)
         *(.text*)
-    } > ROM :text
+    } :text
 
     .rodata ALIGN(4K) : AT(ADDR(.rodata)) {
         *(.rodata*)
-    } > ROM :data
+    } :data
 
-    .bss ALIGN(4K) (NOLOAD) : AT(ADDR(.rodata) + SIZEOF(.rodata))
+    ROM_TEXT_START = ADDR(.text);
+    ROM_TEXT_END = .;
+
+    . = 0x40000000;
+    RAM_TEXT_START = .;
+    . += ROM_TEXT_END - ROM_TEXT_START;
+
+    .bss ALIGN(4K) (NOLOAD) : AT(ADDR(.bss))
     {
         *(.bss.stack*)
         . = ALIGN(16);
@@ -32,5 +40,5 @@ SECTIONS
         *(.bss.kmalloc*)
         . = ALIGN(16);
         *(.bss.ttable*)
-    } > RAM :bss = 0
+    } :bss = 0
 }

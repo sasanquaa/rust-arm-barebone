@@ -27,4 +27,6 @@ static L2_TABLE: [u64; 16] = [0; 16];
 #[link_section = ".bss.ttable"]
 static L3_TABLE: [u64; 16] = [0; 16];
 
-pub unsafe fn init() {}
+pub unsafe fn init() {
+
+}
