@@ -7,10 +7,12 @@
 #![feature(const_maybe_uninit_zeroed)]
 #![feature(core_intrinsics)]
 #![feature(ptr_internals)]
+#![feature(ptr_sub_ptr)]
 #![no_std]
 #![no_main]
 
 use core::arch::asm;
+use core::ptr;
 
 use cfg_if::cfg_if;
 
@@ -27,79 +29,13 @@ mod sys;
 #[naked]
 #[no_mangle]
 #[link_section = ".boot"]
-#[cfg(feature = "boot_from_flash")]
 extern "C" fn boot() {
-    unsafe {
-        asm!(
-            "b {0}",
-            sym start,
-            options(noreturn)
-        );
-    }
-}
-
-#[naked]
-#[no_mangle]
-#[link_section = ".boot"]
-#[cfg(not(feature = "boot_from_flash"))]
-extern "C" fn boot() {
-    extern "C" {
-        static ROM_TEXT_START: usize;
-        static ROM_TEXT_END: usize;
-        static RAM_TEXT_START: usize;
-    }
-    unsafe {
-        cfg_if! {
-            if #[cfg(target_arch="aarch64")] {
-                asm!(
-                    "ldr x0, =ROM_TEXT_START",
-                    "ldr x1, =ROM_TEXT_END",
-                    "ldr x2, =RAM_TEXT_START",
-                    "ldr x3, =start",
-                    "sub x3, x3, x0",
-                    "add x3, x3, x2",
-                    "0:",
-                    "cmp x0, x1",
-                    "bge 1f",
-                    "ldr x4, [x0], #8",
-                    "str x4, [x2], #8",
-                    "blt 0b",
-                    "1:",
-                    "br x3",
-                    options(noreturn)
-                );
-            } else if #[cfg(target_arch="arm")] {
-                asm!(
-                    "ldr r0, =ROM_TEXT_START",
-                    "ldr r1, =ROM_TEXT_END",
-                    "ldr r2, =RAM_TEXT_START",
-                    "ldr r3, =start",
-                    "sub r3, r3, r0",
-                    "add r3, r3, r2",
-                    "0:",
-                    "cmp r0, r1",
-                    "bge 1f",
-                    "ldr r4, [r0], #8",
-                    "str r4, [r2], #8",
-                    "blt 0b",
-                    "1:",
-                    "bx r3", // FIXME: seems to matter about which aarch state is encoded
-                    options(noreturn)
-                );
-            }
-        }
-    }
-}
-
-#[naked]
-#[no_mangle]
-extern "C" fn start() {
     const STACK_SIZE: usize = 32768;
-    #[link_section = ".bss.stack"]
     #[no_mangle]
+    #[link_section = ".bss.stack"]
     static STACK_SPACE: [u8; STACK_SIZE] = [0; STACK_SIZE];
-    #[link_section = ".bss.stack"]
     #[no_mangle]
+    #[link_section = ".bss.stack"]
     static STACK_TOP: [u8; 0] = [0; 0];
     unsafe {
         cfg_if! {
@@ -112,7 +48,7 @@ extern "C" fn start() {
                     "mov sp, x0",
                     "dsb ish",
                     "b {0}",
-                    sym main,
+                    sym start,
                     options(noreturn)
                 );
             } else if #[cfg(target_arch="arm")] {
@@ -127,6 +63,71 @@ extern "C" fn start() {
             }
         }
     }
+}
+
+#[cfg(feature = "boot_from_flash")]
+#[link_section = ".boot"]
+unsafe fn start() {
+    main();
+}
+
+#[cfg(not(feature = "boot_from_flash"))]
+#[link_section = ".boot"]
+unsafe fn start() {
+    let mut rom_text_start = 0;
+    let mut rom_text_size = 0;
+    let mut ram_text_start = 0;
+    let mut rom_rodata_start = 0;
+    let mut rom_rodata_size = 0;
+    let mut ram_rodata_start = 0;
+    asm!(
+        "ldr {out}, =ROM_TEXT_START",
+        out = out(reg) rom_text_start
+    );
+    asm!(
+        "ldr {out}, =ROM_TEXT_SIZE",
+        out = out(reg) rom_text_size
+    );
+    asm!(
+        "ldr {out}, =RAM_TEXT_START",
+        out = out(reg) ram_text_start
+    );
+    asm!(
+        "ldr {out}, =ROM_RODATA_START",
+        out = out(reg) rom_rodata_start
+    );
+    asm!(
+        "ldr {out}, =ROM_RODATA_SIZE",
+        out = out(reg) rom_rodata_size
+    );
+    asm!(
+        "ldr {out}, =RAM_RODATA_START",
+        out = out(reg) ram_rodata_start
+    );
+    macro_rules! copy {
+        ($src:expr, $dst:expr, $count:expr) => {
+            let src: *const u8 = $src;
+            let dst: *mut u8 = $dst;
+            let count: usize = $count;
+            let mut i = 0;
+            while i < count {
+                let src_offset = src.add(i);
+                let dst_offset = dst.add(i);
+                *dst_offset = *src_offset;
+                i = i + 1;
+            }
+        };
+    }
+    let src = ptr::from_exposed_addr::<u8>(rom_text_start);
+    let dst = ptr::from_exposed_addr_mut::<u8>(ram_text_start);
+    let count = rom_text_size;
+    copy!(src, dst, count);
+
+    let src = ptr::from_exposed_addr::<u8>(rom_rodata_start);
+    let dst = ptr::from_exposed_addr_mut::<u8>(ram_rodata_start);
+    let count = rom_rodata_size;
+    copy!(src, dst, count);
+    main();
 }
 
 unsafe fn main() -> ! {
